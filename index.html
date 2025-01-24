@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>silicon.tools - Browser ML Models</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --accent: #ff7b00;
+            --text: #ffffff;
+            --text-secondary: #a0a0a0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 200px;
+            min-width: 200px;
+            background: var(--bg-secondary);
+            padding: 2rem 1rem;
+            border-right: 1px solid #333;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .logo {
+            color: var(--accent);
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .nav-item {
+            padding: 1rem;
+            margin: 0.5rem 0;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(255, 123, 0, 0.1);
+            color: var(--accent);
+        }
+
+        .main-wrapper {
+            flex: 1;
+            margin-left: 200px;
+            /* Match sidebar width */
+            display: flex;
+            justify-content: center;
+            /* Center main content */
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            display: none;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .main-content.active {
+            display: block;
+        }
+
+        textarea,
+        button {
+            width: 100%;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: var(--bg-secondary);
+            border: 1px solid #333;
+            color: var(--text);
+            border-radius: 5px;
+            font-family: inherit;
+        }
+
+        textarea {
+            height: 150px;
+            resize: vertical;
+        }
+
+        button {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.3s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .output {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 5px;
+            min-height: 100px;
+        }
+
+        .status {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: var(--bg-secondary);
+            border: 1px solid #333;
+            color: var(--text);
+            border-radius: 5px;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            position: relative;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ff7b00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 3rem;
+        }
+
+        select:hover {
+            border-color: var(--accent);
+        }
+
+        .drop-zone {
+            width: 100%;
+            height: 200px;
+            padding: 25px;
+            margin: 1rem 0;
+            background: var(--bg-secondary);
+            border: 2px dashed #333;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(255, 123, 0, 0.1);
+        }
+
+        .drop-zone-text {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+
+        .drop-zone-icon {
+            width: 50px;
+            height: 50px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 50%;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .drop-zone-icon::before,
+        .drop-zone-icon::after {
+            content: '';
+            position: absolute;
+            background: var(--text-secondary);
+        }
+
+        .drop-zone-icon::before {
+            width: 2px;
+            height: 20px;
+            top: 13px;
+            left: 22px;
+        }
+
+        .drop-zone-icon::after {
+            width: 20px;
+            height: 2px;
+            top: 22px;
+            left: 13px;
+        }
+
+        .output-container {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .output-container.visible {
+            display: block;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .output-title {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .action-button {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            padding: 0.5rem;
+            margin: 0;
+            width: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .action-button:hover {
+            opacity: 0.8;
+        }
+
+        .action-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .drop-zone-initial,
+        .drop-zone-preview {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-info {
+            color: var(--accent);
+            margin-bottom: 1rem;
+            text-align: center;
+            word-break: break-all;
+            padding: 0 1rem;
+        }
+
+        .drop-zone .action-button {
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent);
+            border-radius: 5px;
+            padding: 0.5rem 1rem;
+        }
+
+        .drop-zone .action-button:hover {
+            background: rgba(255, 123, 0, 0.1);
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                padding: 2rem 1rem;
+            }
+        }
+
+        .content-vertical-padding {
+            padding-top: 10vh;
+            /* Start content 1/3 down the page */
+        }
+
+        /* on small screens start it at the top of the screen */
+        @media (max-width: 1024px) {
+            .content-vertical-padding {
+                padding-top: 0;
+            }
+        }
+
+        .record-controls {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .record-button {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .record-button.recording {
+            background: var(--bg-secondary);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+
+        .record-button .record-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .record-button.recording .record-icon {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="logo">silicon.tools</div>
+        <div class="nav-item active" data-tab="whisper">Whisper ASR</div>
+        <div class="nav-item" data-tab="tts">Text to Speech</div>
+        <div class="nav-item" data-tab="llm">DeepSeek LLM</div>
+    </div>
+    <div class="main-wrapper">
+        <div class="main-content active" id="whisper">
+            <div class="content-vertical-padding">
+                <h2>Speech Recognition</h2>
+                <div class="record-controls">
+                    <button class="record-button" id="recordButton">
+                        <span class="record-icon"></span>
+                        Start Recording
+                    </button>
+                    <button class="record-button" id="stopButton" style="display: none;">
+                        <span class="record-icon"></span>
+                        Stop Recording
+                    </button>
+                </div>
+                <div class="drop-zone" id="whisperDropZone">
+                    <div class="drop-zone-initial">
+                        <div class="drop-zone-icon"></div>
+                        <div class="drop-zone-text">Drag & drop audio file or click to upload</div>
+                    </div>
+                    <div class="drop-zone-preview" style="display: none;">
+                        <div class="file-info"></div>
+                        <button class="action-button" onclick="resetFileInput()">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Change File
+                        </button>
+                    </div>
+                    <input type="file" accept="audio/*" id="audioFile">
+                </div>
+                <button onclick="transcribeAudio()">Transcribe</button>
+                <div class="output-container" id="whisperOutputContainer">
+                    <div class="output-header">
+                        <span class="output-title">Transcription Result</span>
+                        <button class="action-button" onclick="copyTranscription()">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                    <div class="output" id="whisperOutput"></div>
+                </div>
+                <div class="status" id="whisperStatus"></div>
+            </div>
+        </div>
+        <div class="main-content" id="tts">
+            <div class="content-vertical-padding">
+                <h2>Text to Speech</h2>
+                <textarea id="ttsInput" placeholder="Enter text to convert to speech..."></textarea>
+                <select id="voiceSelect">
+                    <option value="af">Default (American Female)</option>
+                    <option value="af_bella">Bella (American Female)</option>
+                    <option value="am_adam">Adam (American Male)</option>
+                    <option value="bf_emma">Emma (British Female)</option>
+                    <option value="bm_george">George (British Male)</option>
+                </select>
+                <button onclick="generateSpeech()">Generate Speech</button>
+                <div class="output-container" id="ttsOutputContainer">
+                    <div class="output-header">
+                        <span class="output-title">Generated Audio</span>
+                        <button class="action-button" onclick="downloadSpeech()">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download
+                        </button>
+                    </div>
+                    <audio id="ttsOutput" controls></audio>
+                </div>
+                <div class="status" id="ttsStatus"></div>
+            </div>
+        </div>
+        <div class="main-content" id="llm">
+            <h2>AI Chat</h2>
+            <textarea id="llmInput" placeholder="Enter your prompt..."></textarea>
+            <button onclick="generateText()">Generate</button>
+            <div class="output-container" id="llmOutputContainer">
+                <div class="output-header">
+                    <span class="output-title">Generated Response</span>
+                </div>
+                <div class="output" id="llmOutput"></div>
+            </div>
+            <div class="status" id="llmStatus"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+        import { KokoroTTS } from 'https://cdn.jsdelivr.net/npm/kokoro-js@1.0.1/+esm';
+        import {
+            AutoTokenizer,
+            AutoModelForCausalLM,
+            TextStreamer,
+            InterruptableStoppingCriteria
+        } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+
+        // Tab switching logic
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                document.querySelectorAll('.main-content').forEach(c => c.classList.remove('active'));
+                item.classList.add('active');
+                document.getElementById(item.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Initialize models
+        let whisperPipeline, ttsPipeline, llmPipeline;
+
+        async function initModels() {
+            try {
+                // Update status for users
+                document.getElementById('whisperStatus').textContent = 'Loading Whisper model...';
+                document.getElementById('ttsStatus').textContent = 'Loading TTS model...';
+                document.getElementById('llmStatus').textContent = 'Loading LLM model...';
+
+                // Initialize Whisper
+                whisperPipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
+                document.getElementById('whisperStatus').textContent = 'Whisper model ready!';
+
+                // Initialize TTS with proper configuration
+                ttsPipeline = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
+                    dtype: "q8"  // Using quantized model for better performance
+                });
+                document.getElementById('ttsStatus').textContent = 'TTS model ready!';
+
+                // Initialize LLM
+                const llmStatus = document.getElementById('llmStatus');
+                llmStatus.textContent = 'Loading LLM model...';
+                try {
+                    window.tokenizer = await AutoTokenizer.from_pretrained(
+                        "onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX"
+                    );
+                    window.model = await AutoModelForCausalLM.from_pretrained(
+                        "onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX",
+                        {
+                            dtype: "q4f16",
+                            device: "webgpu"
+                        }
+                    );
+                    window.stopping_criteria = new InterruptableStoppingCriteria();
+                    llmStatus.textContent = 'LLM model ready!';
+                } catch (e) {
+                    console.error('LLM Error:', e);
+                    llmStatus.textContent = 'Error loading LLM model';
+                }
+
+            } catch (e) {
+                console.error('Error initializing models:', e);
+                // Update UI with error message
+                document.querySelectorAll('.status').forEach(status => {
+                    status.textContent = 'Error loading models. Please check console for details.';
+                    status.style.color = 'var(--accent)';
+                });
+            }
+        }
+
+        // Whisper ASR
+        window.transcribeAudio = async function () {
+            const status = document.getElementById('whisperStatus');
+            const output = document.getElementById('whisperOutput');
+            const outputContainer = document.getElementById('whisperOutputContainer');
+            const file = document.getElementById('audioFile').files[0];
+
+            if (!file) {
+                status.textContent = 'Please select an audio file';
+                return;
+            }
+
+            if (!whisperPipeline) {
+                status.textContent = 'Whisper model is not yet loaded';
+                return;
+            }
+
+            status.textContent = 'Transcribing...';
+            try {
+                const audioData = await read_audio(file);
+                const result = await whisperPipeline(audioData);
+
+                output.textContent = result.text;
+                outputContainer.classList.add('visible');
+                status.textContent = 'Transcription complete!';
+
+                // Reset the file input after successful transcription
+                resetFileInput();
+            } catch (e) {
+                console.error('Whisper Error:', e);
+                status.textContent = 'Error during transcription';
+            }
+        }
+
+        // Text to Speech
+        window.generateSpeech = async function () {
+            const status = document.getElementById('ttsStatus');
+            const outputContainer = document.getElementById('ttsOutputContainer');
+            const text = document.getElementById('ttsInput').value;
+            const voice = document.getElementById('voiceSelect').value;
+
+            if (!text) {
+                status.textContent = 'Please enter some text';
+                return;
+            }
+
+            if (!ttsPipeline) {
+                status.textContent = 'TTS model is not yet loaded';
+                return;
+            }
+
+            status.textContent = 'Generating speech...';
+            try {
+                const audioResult = await ttsPipeline.generate(text, {
+                    voice: voice
+                });
+
+                // Convert to WAV format
+                const wavData = await audioResult.toWav();
+
+                const audioElement = document.getElementById('ttsOutput');
+                const blob = new Blob([wavData], { type: 'audio/wav' });
+                audioElement.src = URL.createObjectURL(blob);
+                outputContainer.classList.add('visible');
+                status.textContent = 'Speech generated!';
+                window.currentAudioBlob = blob; // Store for download
+            } catch (e) {
+                console.error('TTS Error:', e);
+                status.textContent = 'Error generating speech';
+            }
+        }
+
+        // LLM Text Generation
+        window.generateText = async function () {
+            const status = document.getElementById('llmStatus');
+            const output = document.getElementById('llmOutput');
+            const outputContainer = document.getElementById('llmOutputContainer');
+            const input = document.getElementById('llmInput').value;
+
+            if (!input) {
+                status.textContent = 'Please enter a prompt';
+                return;
+            }
+
+            if (!window.model || !window.tokenizer) {
+                status.textContent = 'LLM model is not yet loaded';
+                return;
+            }
+
+            status.textContent = 'Generating response...';
+
+            try {
+                // Create messages array with user input
+                const messages = [{
+                    role: "user",
+                    content: input
+                }];
+
+                // Apply chat template
+                const inputs = window.tokenizer.apply_chat_template(messages, {
+                    add_generation_prompt: true,
+                    return_dict: true
+                });
+
+                // Get thinking token IDs
+                const [START_THINKING_TOKEN_ID, END_THINKING_TOKEN_ID] = window.tokenizer.encode(
+                    "<think></think>",
+                    { add_special_tokens: false }
+                );
+
+                let state = "thinking";
+                let startTime;
+                let numTokens = 0;
+                let tps;
+                let outputText = '';
+                let isThinkingVisible = false;
+
+                // Create streamer
+                const streamer = new TextStreamer(window.tokenizer, {
+                    skip_prompt: true,
+                    skip_special_tokens: true,
+                    callback_function: (text) => {
+                        outputText += text;
+                        // Only show non-thinking text by default
+                        output.textContent = state === "thinking" && !isThinkingVisible ? "" : outputText;
+                    },
+                    token_callback_function: (tokens) => {
+                        startTime ??= performance.now();
+                        if (numTokens++ > 0) {
+                            tps = (numTokens / (performance.now() - startTime)) * 1000;
+                        }
+                        if (tokens[0] == END_THINKING_TOKEN_ID) {
+                            state = "answering";
+                            if (!isThinkingVisible) {
+                                outputText = ''; // Clear thinking tokens if not visible
+                            }
+                        }
+                        status.textContent = `${state === "thinking" ? "Thinking" : "Generating"} (${Math.round(tps)} tokens/sec)`;
+                    }
+                });
+
+                // Add toggle button for thinking tokens
+                const toggleButton = document.createElement('button');
+                toggleButton.className = 'action-button';
+                toggleButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    Show Thinking
+                `;
+                toggleButton.onclick = () => {
+                    isThinkingVisible = !isThinkingVisible;
+                    toggleButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        ${isThinkingVisible ? 'Hide' : 'Show'} Thinking
+                    `;
+                    output.textContent = isThinkingVisible ? outputText : outputText.replace(/^.*?(?=\n|$)/, '');
+                };
+
+                // Add toggle button to output header
+                const outputHeader = outputContainer.querySelector('.output-header');
+                outputHeader.appendChild(toggleButton);
+
+                // Generate text
+                const { sequences } = await window.model.generate({
+                    ...inputs,
+                    do_sample: false,
+                    max_new_tokens: 2048,
+                    streamer,
+                    stopping_criteria: window.stopping_criteria,
+                    return_dict_in_generate: true
+                });
+
+                outputContainer.classList.add('visible');
+                status.textContent = 'Generation complete!';
+
+            } catch (e) {
+                console.error('LLM Error:', e);
+                status.textContent = 'Error generating response';
+            }
+        }
+
+        // Drop zone functionality
+        function setupDropZone(dropZoneId, inputId) {
+            const dropZone = document.getElementById(dropZoneId);
+            const input = document.getElementById(inputId);
+            const initialView = dropZone.querySelector('.drop-zone-initial');
+            const previewView = dropZone.querySelector('.drop-zone-preview');
+            const fileInfo = dropZone.querySelector('.file-info');
+
+            function updateFileInfo(file) {
+                if (file) {
+                    fileInfo.textContent = `Selected file: ${file.name}`;
+                    initialView.style.display = 'none';
+                    previewView.style.display = 'flex';
+                } else {
+                    initialView.style.display = 'flex';
+                    previewView.style.display = 'none';
+                }
+            }
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    if (initialView.style.display !== 'none') {
+                        dropZone.classList.add('dragover');
+                    }
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    dropZone.classList.remove('dragover');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                input.files = files;
+                updateFileInfo(files[0]);
+            });
+
+            input.addEventListener('change', (e) => {
+                updateFileInfo(e.target.files[0]);
+            });
+
+            initialView.addEventListener('click', () => {
+                input.click();
+            });
+        }
+
+        // Initialize drop zones
+        setupDropZone('whisperDropZone', 'audioFile');
+
+        // Initialize models on page load
+        initModels().catch(console.error);
+
+        // Copy transcription
+        window.copyTranscription = async function () {
+            const text = document.getElementById('whisperOutput').textContent;
+            try {
+                await navigator.clipboard.writeText(text);
+                document.getElementById('whisperStatus').textContent = 'Copied to clipboard!';
+            } catch (e) {
+                console.error('Copy Error:', e);
+                document.getElementById('whisperStatus').textContent = 'Failed to copy to clipboard';
+            }
+        }
+
+        // Download speech
+        window.downloadSpeech = function () {
+            if (window.currentAudioBlob) {
+                const url = URL.createObjectURL(window.currentAudioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'generated-speech.wav';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Add this function before the transcribeAudio function:
+        async function read_audio(file, sampling_rate = 16000) {
+            // Create audio context
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampling_rate });
+
+            // Read file as ArrayBuffer
+            const buffer = await file.arrayBuffer();
+
+            // Decode audio data
+            const audioBuffer = await audioContext.decodeAudioData(buffer);
+
+            // Get the first channel data
+            let samples = audioBuffer.getChannelData(0);
+
+            // If stereo, merge channels
+            if (audioBuffer.numberOfChannels === 2) {
+                const SCALING_FACTOR = Math.sqrt(2);
+                const channel2 = audioBuffer.getChannelData(1);
+
+                // Create new array for merged samples
+                const mergedSamples = new Float32Array(samples.length);
+
+                // Merge channels
+                for (let i = 0; i < samples.length; ++i) {
+                    mergedSamples[i] = (SCALING_FACTOR * (samples[i] + channel2[i])) / 2;
+                }
+
+                samples = mergedSamples;
+            }
+
+            // Resample if needed
+            if (audioBuffer.sampleRate !== sampling_rate) {
+                const resampledLength = Math.round(samples.length * sampling_rate / audioBuffer.sampleRate);
+                const resampledSamples = new Float32Array(resampledLength);
+
+                for (let i = 0; i < resampledLength; i++) {
+                    const originalIndex = i * audioBuffer.sampleRate / sampling_rate;
+                    const index1 = Math.floor(originalIndex);
+                    const index2 = Math.min(index1 + 1, samples.length - 1);
+                    const fraction = originalIndex - index1;
+
+                    // Linear interpolation
+                    resampledSamples[i] = (1 - fraction) * samples[index1] + fraction * samples[index2];
+                }
+
+                samples = resampledSamples;
+            }
+
+            return samples;
+        }
+
+        // Add reset function
+        window.resetFileInput = function () {
+            const input = document.getElementById('audioFile');
+            const dropZone = document.getElementById('whisperDropZone');
+            const initialView = dropZone.querySelector('.drop-zone-initial');
+            const previewView = dropZone.querySelector('.drop-zone-preview');
+
+            input.value = '';
+            initialView.style.display = 'flex';
+            previewView.style.display = 'none';
+
+            // Reset recording UI
+            recordButton.style.display = 'flex';
+            stopButton.style.display = 'none';
+            recordButton.classList.remove('recording');
+        }
+
+        // Audio Recording Setup
+        let mediaRecorder;
+        let audioChunks = [];
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+
+        recordButton.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioChunks = [];
+
+                    // Create a File object from the Blob
+                    const audioFile = new File([audioBlob], 'recorded-audio.wav', { type: 'audio/wav' });
+
+                    // Update the file input and show preview
+                    const input = document.getElementById('audioFile');
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(audioFile);
+                    input.files = dataTransfer.files;
+
+                    // Update the file info display
+                    const dropZone = document.getElementById('whisperDropZone');
+                    const fileInfo = dropZone.querySelector('.file-info');
+                    const initialView = dropZone.querySelector('.drop-zone-initial');
+                    const previewView = dropZone.querySelector('.drop-zone-preview');
+
+                    fileInfo.textContent = 'Selected file: recorded-audio.wav';
+                    initialView.style.display = 'none';
+                    previewView.style.display = 'flex';
+
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                recordButton.style.display = 'none';
+                stopButton.style.display = 'flex';
+                recordButton.classList.add('recording');
+                document.getElementById('whisperStatus').textContent = 'Recording...';
+            } catch (e) {
+                console.error('Recording Error:', e);
+                document.getElementById('whisperStatus').textContent = 'Error accessing microphone';
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordButton.style.display = 'flex';
+                stopButton.style.display = 'none';
+                recordButton.classList.remove('recording');
+                document.getElementById('whisperStatus').textContent = 'Recording stopped';
+            }
+        });
+    </script>
+</body>
+
+</html>
