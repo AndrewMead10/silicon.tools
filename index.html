@@ -38,6 +38,8 @@
             border-right: 1px solid #333;
             position: fixed;
             height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .logo {
@@ -460,7 +462,20 @@
         .title-container .status {
             color: var(--text-secondary);
             font-size: 0.9rem;
-            margin: 0;  /* Remove default margin */
+            margin: 0;
+            margin-right: auto; /* Push the button to the right */
+        }
+
+        .title-container button {
+            width: auto;
+            padding: 0.5rem 1rem;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+
+        /* Update model load prompt styles */
+        .model-load-prompt {
+            display: none !important; /* Hide the old prompts */
         }
 
         /* Modify copy button styles */
@@ -569,17 +584,8 @@
             }
 
             .sidebar {
-                width: 100%;
-                min-width: 100%;
-                height: auto;
-                position: static;
+                flex-direction: row;
                 padding: 1rem;
-                border-right: none;
-                border-bottom: 1px solid #333;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 1rem;
             }
 
             .logo {
@@ -628,6 +634,94 @@
             .nav-item.active[data-tab="tts"]::after {
                 display: inline;
             }
+
+            .sidebar-bottom {
+                margin-top: 0;
+                margin-left: auto;
+                flex-direction: row;
+                padding-top: 0;
+                border-top: none;
+                gap: 0.5rem;
+            }
+
+            .sidebar-bottom .nav-item {
+                padding: 0.5rem 1rem;
+            }
+        }
+
+        /* Add styles for the bottom buttons container */
+        .sidebar-bottom {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+        }
+
+        .sidebar-bottom .nav-item {
+            font-size: 0.9rem;
+            padding: 0.75rem;
+            margin: 0;
+            opacity: 0.8;
+        }
+
+        /* Settings styles */
+        .settings-section {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border: 1px solid #333;
+        }
+
+        .settings-section h3 {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .model-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .model-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border: 1px solid #333;
+        }
+
+        .model-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .model-name {
+            font-weight: bold;
+        }
+
+        .model-status {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .model-status.loaded {
+            color: #4CAF50;
+        }
+
+        .model-status.unloaded {
+            color: var(--text-secondary);
+        }
+
+        .model-toggle-btn {
+            width: auto;
+            margin: 0;
+            padding: 0.5rem 1rem;
         }
     </style>
 </head>
@@ -655,13 +749,18 @@
         <div class="nav-item active" data-tab="whisper"><span>Transcribe</span></div>
         <div class="nav-item" data-tab="tts"><span>Text to Speech</span></div>
         <div class="nav-item" data-tab="llm">Chat</div>
+        <div class="sidebar-bottom">
+            <div class="nav-item" data-tab="settings">Settings</div>
+            <div class="nav-item" onclick="window.open('https://ko-fi.com/silicontools', '_blank')">Donate</div>
+        </div>
     </div>
     <div class="main-wrapper">
         <div class="main-content active" id="whisper">
             <div class="content-vertical-padding">
                 <div class="title-container">
                     <h2>Speech Recognition</h2>
-                    <div class="status" id="whisperStatus"></div>
+                    <div class="status" id="whisperStatus">Model not loaded</div>
+                    <button id="whisperLoadBtn" onclick="toggleModel('whisper')">Load Model</button>
                 </div>
                 <div class="drop-zone" id="whisperDropZone">
                     <div class="drop-zone-initial">
@@ -717,7 +816,8 @@
             <div class="content-vertical-padding">
                 <div class="title-container">
                     <h2>Text to Speech</h2>
-                    <div class="status" id="ttsStatus"></div>
+                    <div class="status" id="ttsStatus">Model not loaded</div>
+                    <button id="ttsLoadBtn" onclick="toggleModel('tts')">Load Model</button>
                 </div>
                 <textarea id="ttsInput" placeholder="Enter text to convert to speech..."></textarea>
                 <select id="voiceSelect">
@@ -748,9 +848,11 @@
         <div class="main-content" id="llm">
             <div class="content-vertical-padding">
                 <div class="title-container">
-                    <h2>AI Chat</h2>
-                    <div class="status" id="llmStatus"></div>
+                    <h2>AI Chat <span style="font-size: 0.6em; background: var(--accent); color: var(--bg-primary); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 8px;">BETA</span></h2>
+                    <div class="status" id="llmStatus">Model not loaded</div>
+                    <button id="llmLoadBtn" onclick="toggleModel('llm')">Load Model</button>
                 </div>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Note: This model currently runs very slowly. We are working on making this faster.</p>
                 <textarea id="llmInput" placeholder="Enter your prompt..."></textarea>
                 <button onclick="generateText()">Generate</button>
                 <div class="output-container" id="llmOutputContainer">
@@ -758,6 +860,45 @@
                         <span class="output-title">Generated Response</span>
                     </div>
                     <div class="output" id="llmOutput"></div>
+                </div>
+            </div>
+        </div>
+        <div class="main-content" id="settings">
+            <div class="content-vertical-padding">
+                <div class="title-container">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-section">
+                    <h3>Models</h3>
+                    <div class="model-list">
+                        <div class="model-item">
+                            <div class="model-info">
+                                <span class="model-name">Whisper ASR</span>
+                                <span class="model-status" data-model="whisper">Checking...</span>
+                            </div>
+                            <button class="model-toggle-btn" data-model="whisper" onclick="toggleModel('whisper')">
+                                Loading...  
+                            </button>
+                        </div>
+                        <div class="model-item">
+                            <div class="model-info">
+                                <span class="model-name">Text to Speech</span>
+                                <span class="model-status" data-model="tts">Checking...</span>
+                            </div>
+                            <button class="model-toggle-btn" data-model="tts" onclick="toggleModel('tts')">
+                                Loading...
+                            </button>
+                        </div>
+                        <div class="model-item">
+                            <div class="model-info">
+                                <span class="model-name">Chat LLM</span>
+                                <span class="model-status" data-model="llm">Checking...</span>
+                            </div>
+                            <button class="model-toggle-btn" data-model="llm" onclick="toggleModel('llm')">
+                                Loading...
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -783,52 +924,146 @@
             });
         });
 
-        // Initialize models
-        let whisperPipeline, ttsPipeline, llmPipeline;
+        // Add model management state
+        const modelState = {
+            whisper: null,
+            tts: null,
+            llm: null
+        };
 
+        // Load saved preferences
+        const loadPreferences = () => {
+            const preferences = JSON.parse(localStorage.getItem('modelPreferences')) || {};
+            return {
+                whisper: preferences.whisper === true, // default to false if not set
+                tts: preferences.tts === true,
+                llm: preferences.llm === true
+            };
+        };
+
+        // Save preferences
+        const savePreferences = (preferences) => {
+            localStorage.setItem('modelPreferences', JSON.stringify(preferences));
+        };
+
+        // Update UI based on model state
+        const updateModelUI = (modelId, isLoaded) => {
+            const status = document.querySelector(`.model-status[data-model="${modelId}"]`);
+            const button = document.querySelector(`.model-toggle-btn[data-model="${modelId}"]`);
+            const mainStatus = document.getElementById(`${modelId}Status`);
+            const loadBtn = document.getElementById(`${modelId}LoadBtn`);
+
+            if (status && button) {
+                status.textContent = isLoaded ? 'Loaded' : 'Unloaded';
+                status.className = `model-status ${isLoaded ? 'loaded' : 'unloaded'}`;
+                button.textContent = isLoaded ? 'Unload' : 'Load';
+                button.disabled = false; // Make sure button is enabled
+            }
+
+            // Update main tab UI
+            if (mainStatus && loadBtn) {
+                if (isLoaded) {
+                    mainStatus.textContent = 'Model ready';
+                    loadBtn.style.display = 'none';
+                } else {
+                    mainStatus.textContent = 'Model not loaded';
+                    loadBtn.style.display = 'block';
+                }
+            }
+        };
+
+        // Toggle model loading
+        window.toggleModel = async (modelId) => {
+            const preferences = loadPreferences();
+            const button = document.querySelector(`.model-toggle-btn[data-model="${modelId}"]`);
+            const status = document.querySelector(`.model-status[data-model="${modelId}"]`);
+            
+            if (!button || !status) return;
+            
+            button.disabled = true;
+            status.textContent = modelState[modelId] ? 'Unloading...' : 'Loading...';
+
+            if (modelState[modelId]) {
+                // Unload model
+                modelState[modelId] = null;
+                preferences[modelId] = false;
+                updateModelUI(modelId, false);
+            } else {
+                // Load model
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                const loadingStatus = loadingOverlay.querySelector('.loading-status');
+                loadingOverlay.style.display = 'flex';
+                loadingStatus.textContent = `Loading ${modelId.toUpperCase()} model...`;
+
+                try {
+                    switch (modelId) {
+                        case 'whisper':
+                            modelState.whisper = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
+                            break;
+                        case 'tts':
+                            modelState.tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
+                                dtype: "q8"
+                            });
+                            break;
+                        case 'llm':
+                            modelState.llm = await pipeline('text-generation', 'Mozilla/Qwen2.5-0.5B-Instruct', {
+                                quantized: true
+                            });
+                            break;
+                    }
+                    preferences[modelId] = true;
+                    updateModelUI(modelId, true);
+                } catch (e) {
+                    console.error(`Error loading ${modelId} model:`, e);
+                    updateModelUI(modelId, false);
+                } finally {
+                    loadingOverlay.style.display = 'none';
+                }
+            }
+
+            savePreferences(preferences);
+            button.disabled = false;
+        };
+
+        // Initialize models based on preferences
         async function initModels() {
+            const preferences = loadPreferences();
             const loadingOverlay = document.getElementById('loadingOverlay');
             const loadingStatus = loadingOverlay.querySelector('.loading-status');
-            loadingOverlay.style.display = 'flex';
+            
+            // Update initial UI state for all models
+            Object.keys(modelState).forEach(modelId => {
+                updateModelUI(modelId, false);
+            });
+            
+            if (Object.values(preferences).some(v => v)) {
+                loadingOverlay.style.display = 'flex';
+            }
 
             try {
-                // Update loading status for each model
-                loadingStatus.textContent = 'Loading ASR model...';
-                whisperPipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
-                
-                loadingStatus.textContent = 'Loading TTS model...';
-                ttsPipeline = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
-                    dtype: "q8"
-                });
-                
-                loadingStatus.textContent = 'Loading LLM model...';
-                try {
-                    window.tokenizer = await AutoTokenizer.from_pretrained(
-                        "Mozilla/Qwen2.5-0.5B-Instruct"
-                    );
-                    window.model = await AutoModelForCausalLM.from_pretrained(
-                        "Mozilla/Qwen2.5-0.5B-Instruct",
-                        {
-                            dtype: "q4",
-                        }
-                    );
-                    window.stopping_criteria = new InterruptableStoppingCriteria();
-                } catch (e) {
-                    console.error('LLM Error:', e);
-                    document.getElementById('llmStatus').textContent = 'Error loading model';
+                if (preferences.whisper) {
+                    loadingStatus.textContent = 'Loading ASR model...';
+                    modelState.whisper = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
+                    updateModelUI('whisper', true);
                 }
-
-                // Update all status indicators
-                document.getElementById('whisperStatus').textContent = 'Model ready';
-                document.getElementById('ttsStatus').textContent = 'Model ready';
-                document.getElementById('llmStatus').textContent = 'Model ready';
                 
+                if (preferences.tts) {
+                    loadingStatus.textContent = 'Loading TTS model...';
+                    modelState.tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-ONNX", {
+                        dtype: "q8"
+                    });
+                    updateModelUI('tts', true);
+                }
+                
+                if (preferences.llm) {
+                    loadingStatus.textContent = 'Loading LLM model...';
+                    modelState.llm = await pipeline('text-generation', 'Mozilla/Qwen2.5-0.5B-Instruct', {
+                        dtype: "q4"
+                    });
+                    updateModelUI('llm', true);
+                }
             } catch (e) {
                 console.error('Error initializing models:', e);
-                document.querySelectorAll('.status').forEach(status => {
-                    status.textContent = 'Error loading model';
-                    status.style.color = 'var(--accent)';
-                });
             } finally {
                 loadingOverlay.style.display = 'none';
             }
@@ -848,7 +1083,7 @@
                 return;
             }
 
-            if (!whisperPipeline) {
+            if (!modelState.whisper) {
                 status.textContent = 'Model is not yet loaded';
                 return;
             }
@@ -859,7 +1094,7 @@
 
             try {
                 const audioData = await read_audio(file);
-                const result = await whisperPipeline(audioData);
+                const result = await modelState.whisper(audioData);
 
                 output.textContent = result.text;
                 outputContainer.classList.add('visible');
@@ -887,7 +1122,7 @@
                 return;
             }
 
-            if (!ttsPipeline) {
+            if (!modelState.tts) {
                 status.textContent = 'TTS model is not yet loaded';
                 return;
             }
@@ -897,7 +1132,7 @@
             status.textContent = 'Generating speech...';
 
             try {
-                const audioResult = await ttsPipeline.generate(text, {
+                const audioResult = await modelState.tts.generate(text, {
                     voice: voice
                 });
 
@@ -919,62 +1154,43 @@
 
         // LLM Text Generation
         window.generateText = async function () {
-            const status = document.getElementById('llmStatus');
+            const input = document.getElementById('llmInput');
             const output = document.getElementById('llmOutput');
-            const outputContainer = document.getElementById('llmOutputContainer');
-            const input = document.getElementById('llmInput').value;
+            const status = document.getElementById('llmStatus');
 
-            if (!input) {
-                status.textContent = 'Please enter a prompt';
+            if (!modelState.llm) {
+                status.textContent = 'Model not loaded';
                 return;
             }
-
-            if (!window.model || !window.tokenizer) {
-                status.textContent = 'LLM model is not yet loaded';
-                return;
-            }
-
-            status.textContent = 'Generating response...';
-            outputContainer.classList.add('visible');
-            output.textContent = ''; // Clear previous output
 
             try {
-                // Create messages array with user input
-                const messages = [{
-                    role: "user",
-                    content: input
-                }];
+                const text = input.value.trim();
+                if (!text) return;
 
-                // Apply chat template
-                const inputs = window.tokenizer.apply_chat_template(messages, {
-                    add_generation_prompt: true,
-                    return_dict: true
-                });
-
-                let startTime = performance.now();
+                output.textContent = '';
                 let numTokens = 0;
+                const startTime = performance.now();
+                status.textContent = 'Generating...';
 
-                // Create streamer for token-by-token output
-                const streamer = new TextStreamer(window.tokenizer, {
-                    skip_prompt: true,
-                    skip_special_tokens: true,
-                    callback_function: (text) => {
-                        output.textContent += text;
-                    },
-                    token_callback_function: () => {
-                        numTokens++;
-                        const elapsedSeconds = (performance.now() - startTime) / 1000;
-                        const tokensPerSecond = numTokens / elapsedSeconds;
-                        status.textContent = `Generating (${tokensPerSecond.toFixed(2)} tokens/sec)`;
-                    }
-                });
+                // Create a TextGenerationStreamOutput instance
+                // const streamer = new TextGenerationStreamOutput({
+                //     skip_special_tokens: true,
+                //     callback_function: (text) => {
+                //         output.textContent += text;
+                //     },
+                //     token_callback_function: () => {
+                //         numTokens++;
+                //         const elapsedSeconds = (performance.now() - startTime) / 1000;
+                //         const tokensPerSecond = numTokens / elapsedSeconds;
+                //         status.textContent = `Generating (${tokensPerSecond.toFixed(2)} tokens/sec)`;
+                //     }
+                // });
 
-                // Generate text with streaming
-                window.model.generate({
-                    ...inputs,
+                // Use the pipeline's call method with streaming
+                await modelState.llm(text, {
                     max_new_tokens: 2048,
                     do_sample: false,
-                    streamer,
+                    // streamer,
                     stopping_criteria: window.stopping_criteria
                 });
 
@@ -1046,9 +1262,6 @@
 
         // Initialize drop zones
         setupDropZone('whisperDropZone', 'audioFile');
-
-        // Initialize models on page load
-        initModels().catch(console.error);
 
         // Copy transcription
         window.copyTranscription = async function () {
@@ -1207,6 +1420,9 @@
                 document.getElementById('whisperStatus').textContent = 'Recording stopped';
             }
         });
+
+        // Make sure to call initModels after everything is defined
+        initModels().catch(console.error);
     </script>
 </body>
 
