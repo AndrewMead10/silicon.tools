@@ -140,7 +140,7 @@ export default function TextToSpeech({
     };
 
     return (
-        <div className="w-full max-w-3xl p-8">
+        <div className="w-full max-w-3xl p-4 md:p-8">
             <div className="flex items-center gap-4 mb-8">
                 <h2 className="text-2xl">Text to Speech</h2>
                 <div className="text-[#a0a0a0]">

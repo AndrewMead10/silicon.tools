@@ -144,7 +144,7 @@ export default function LLMChat({
     };
 
     return (
-        <div className="w-full max-w-3xl p-8">
+        <div className="w-full max-w-3xl p-4 md:p-8">
             <div className="flex items-center gap-4 mb-8">
                 <h2 className="text-2xl">
                     AI Chat
