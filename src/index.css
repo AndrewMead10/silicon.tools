@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+@layer base {
+    :root {
+        --bg-primary: #0a0a0a;
+        --bg-secondary: #1a1a1a;
+        --accent: #ff7b00;
+    }
+}
+
+body {
+    @apply bg-[var(--bg-primary)] text-white min-h-screen;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.nav-item {
+    @apply p-4 my-2 cursor-pointer rounded transition-all duration-250;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    @apply bg-[var(--accent)]/10 text-[var(--accent)];
+}
+
+.drop-zone {
+    @apply w-full h-48 p-6 my-4 bg-[var(--bg-secondary)] border-2 border-dashed border-[#252525] rounded-lg flex items-center justify-center flex-col cursor-pointer transition-all duration-250 relative hover:-translate-x-3 hover:-translate-y-3;
+}
+
+.drop-zone::before {
+    content: '';
+    @apply absolute -inset-[2px] border-2 border-[var(--accent)] rounded-lg -z-10;
+}
+
+.drop-zone::after {
+    content: '';
+    @apply absolute inset-0 border-2 border-dashed border-[var(--bg-primary)] rounded-lg opacity-0 transition-opacity duration-250;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    @apply border-[var(--accent)] bg-[var(--bg-primary)] border-dashed rounded-lg;
+}
+
+.drop-zone:hover::before {
+    @apply border-[var(--accent)] translate-x-3 translate-y-3 rounded-lg;
+}
+
+.drop-zone:hover::after {
+    @apply opacity-100 translate-x-3 translate-y-3 border-[var(--bg-primary)] border-dashed rounded-lg;
+}
+
+/* Button Styles */
+.button-primary {
+    @apply relative transition-transform duration-250 hover:-translate-x-3 hover:-translate-y-3 bg-[var(--accent)] text-[var(--bg-primary)] font-bold cursor-pointer;
+}
+
+.button-primary::after {
+    content: '';
+    @apply absolute inset-0 border-2 border-[var(--accent)] opacity-0 transition-opacity duration-250;
+}
+
+.button-primary:hover::after {
+    @apply opacity-100 translate-x-3 translate-y-3;
+}
+
+.button-secondary {
+    @apply relative transition-transform duration-250 hover:-translate-x-3 hover:-translate-y-3 bg-[var(--bg-secondary)] text-[var(--accent)] cursor-pointer;
+}
+
+.button-secondary:hover {
+    @apply bg-[#252525];
+}
+
+.button-secondary::after {
+    content: '';
+    @apply absolute inset-0 border-2 border-[var(--bg-secondary)] opacity-0 transition-opacity duration-250;
+}
+
+.button-secondary:hover::after {
+    @apply opacity-100 translate-x-3 translate-y-3 border-[#252525];
+}
