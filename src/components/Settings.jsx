@@ -71,6 +71,14 @@ export default function Settings({
                     <div className="flex justify-between items-center p-4 bg-[#0a0a0a] border border-[#333]">
                         <div>
                             <div className="font-bold">Whisper ASR</div>
+                            <a
+                                href="https://huggingface.co/openai/whisper-base"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-[#ff7b00] hover:underline"
+                            >
+                                whisper-base
+                            </a>
                             <div className={`text-sm ${modelState.whisper ? 'text-green-500' : 'text-[#a0a0a0]'}`}>
                                 {modelState.whisper ? 'Loaded' : 'Unloaded'}
                             </div>
@@ -86,6 +94,14 @@ export default function Settings({
                     <div className="flex justify-between items-center p-4 bg-[#0a0a0a] border border-[#333]">
                         <div>
                             <div className="font-bold">Text to Speech</div>
+                            <a
+                                href="https://huggingface.co/hexgrad/Kokoro-82M"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-[#ff7b00] hover:underline"
+                            >
+                                Kokoro-82M
+                            </a>
                             <div className={`text-sm ${modelState.tts ? 'text-green-500' : 'text-[#a0a0a0]'}`}>
                                 {modelState.tts ? 'Loaded' : 'Unloaded'}
                             </div>
@@ -101,6 +117,14 @@ export default function Settings({
                     <div className="flex justify-between items-center p-4 bg-[#0a0a0a] border border-[#333]">
                         <div>
                             <div className="font-bold">Chat LLM</div>
+                            <a
+                                href="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-[#ff7b00] hover:underline"
+                            >
+                                Qwen2.5-0.5B-Instruct
+                            </a>
                             <div className={`text-sm ${modelState.llm ? 'text-green-500' : 'text-[#a0a0a0]'}`}>
                                 {modelState.llm ? 'Loaded' : 'Unloaded'}
                             </div>

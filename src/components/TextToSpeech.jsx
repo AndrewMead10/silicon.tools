@@ -144,7 +144,7 @@ export default function TextToSpeech({
             <div className="flex items-center gap-4 mb-8">
                 <h2 className="text-2xl">Text to Speech</h2>
                 <div className="text-[#a0a0a0]">
-                    {!modelState.tts ? 'Model not loaded' :
+                    {!modelState.tts ? (loadingProgress > 0 ? 'Loading model...' : 'Model not loaded') :
                         isProcessing ? 'Generating...' : 'Model ready'}
                 </div>
                 <div className="flex-1" />

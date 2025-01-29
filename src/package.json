@@ -1,5 +1,5 @@
 {
-    "name": "llama-3.2-reasoning-webgpu",
+    "name": "silicon.tools",
     "private": true,
     "version": "0.0.0",
     "type": "module",

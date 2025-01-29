@@ -55,7 +55,7 @@ function App() {
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
                 />
-                <div className="flex-1 ml-[200px] flex justify-center">
+                <div className="flex-1 md:ml-[200px] pt-20 md:pt-0 flex justify-center w-full">
                     {activeTab === 'whisper' && (
                         <WhisperASR
                             modelState={modelState}

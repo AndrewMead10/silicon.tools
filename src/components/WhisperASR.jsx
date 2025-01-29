@@ -267,7 +267,7 @@ export default function WhisperASR({
             <div className="flex items-center gap-4 mb-8">
                 <h2 className="text-2xl">Speech Recognition</h2>
                 <div className="text-[#a0a0a0]">
-                    {!modelState.whisper ? 'Model not loaded' :
+                    {!modelState.whisper ? (loadingProgress > 0 ? 'Loading model...' : 'Model not loaded') :
                         isProcessing ? 'Transcribing...' : 'Model ready'}
                 </div>
                 <div className="flex-1" />

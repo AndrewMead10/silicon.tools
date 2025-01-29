@@ -6,7 +6,7 @@ export default function About() {
             <div className="space-y-6 text-gray-300">
                 <p>
                     silicon.tools is a collection of AI-powered tools that run entirely in your browser.
-                    No data leaves your device - all processing happens locally using WebAssembly and WebWorkers.
+                    No data leaves your device - all processing happens locally on your computer.
                 </p>
 
                 <div>
@@ -14,7 +14,7 @@ export default function About() {
                     <ul className="list-disc pl-6 space-y-2">
                         <li>Speech-to-Text transcription using Whisper</li>
                         <li>Text-to-Speech synthesis</li>
-                        <li>AI Chat powered by various open-source LLMs</li>
+                        <li>AI Chat powered by open-source LLMs</li>
                     </ul>
                 </div>
 
@@ -31,10 +31,10 @@ export default function About() {
                     <p>
                         This project is open source and available on{' '}
                         <a
-                            href="https://github.com/nsarrazin/silicon.tools"
+                            href="https://github.com/andrewmead10/silicon.tools"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#ff7b00] hover:underline"
+                            className="text-[#ff7b00] hover:underline hover:text-[#ff9533]"
                         >
                             GitHub
                         </a>.

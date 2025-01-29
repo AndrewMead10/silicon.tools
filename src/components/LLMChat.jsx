@@ -153,7 +153,7 @@ export default function LLMChat({
                     </span>
                 </h2>
                 <div className="text-[#a0a0a0]">
-                    {modelState.llm ? 'Model ready' : 'Model not loaded'}
+                    {!modelState.llm ? (isGenerating ? 'Loading model...' : 'Model not loaded') : 'Model ready'}
                 </div>
                 <div className="flex-1" />
                 {!modelState.llm && !isGenerating && (
