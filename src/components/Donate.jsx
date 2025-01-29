@@ -12,7 +12,7 @@ export default function Donate() {
                 <div className="space-y-4">
                     <button
                         className="button-primary w-full p-4"
-                        onClick={() => window.location.href = 'https://donate.stripe.com/test_fZe7vT0HTaWOghO7ss'}
+                        onClick={() => window.location.href = 'https://donate.stripe.com/8wM8Awahy7537oAbII'}
                     >
                         Donate with Stripe
                     </button>
