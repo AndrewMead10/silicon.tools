@@ -12,7 +12,7 @@
     "dependencies": {
         "@huggingface/transformers": "^3.3.2",
         "@tailwindcss/vite": "^4.0.0",
-        "@wllama/wllama": "^2.1.4",
+        "@wllama/wllama": "^2.2.0",
         "better-react-mathjax": "^2.0.3",
         "dompurify": "^3.2.3",
         "kokoro-js": "^1.0.1",

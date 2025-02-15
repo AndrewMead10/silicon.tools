@@ -1,4 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { ModelManager, Wllama } from '@wllama/wllama/esm';
+import { WLLAMA_CONFIG_PATHS, LIST_MODELS } from '../config';
+
+const DEFAULT_PARAMS = {
+    nPredict: 2048,
+    temperature: 0.7,
+    nThreads: 0, // auto
+    nContext: 2048,
+    nBatch: 512,
+};
 
 export default function LLMChat({
     modelState,
@@ -13,73 +23,119 @@ export default function LLMChat({
     const [tokensPerSecond, setTokensPerSecond] = useState(0);
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const workerRef = useRef(null);
+    const wllamaRef = useRef(null);
+    const modelManagerRef = useRef(null);
+    const startTimeRef = useRef(0);
+    const numTokensRef = useRef(0);
+    const isInitializedRef = useRef(false);
+
+    // Cleanup function to properly close model and manager
+    const cleanup = async () => {
+        if (wllamaRef.current) {
+            try {
+                await wllamaRef.current.exit();
+            } catch (error) {
+                console.error('Error during wllama cleanup:', error);
+            }
+            wllamaRef.current = null;
+        }
+        if (modelManagerRef.current) {
+            try {
+                await modelManagerRef.current.clear();
+            } catch (error) {
+                console.error('Error clearing model manager:', error);
+            }
+            modelManagerRef.current = null;
+        }
+        isInitializedRef.current = false;
+    };
+
+    // Initialize wllama and model manager
+    const initialize = async () => {
+        if (!isInitializedRef.current) {
+            modelManagerRef.current = new ModelManager();
+            wllamaRef.current = new Wllama(WLLAMA_CONFIG_PATHS);
+            isInitializedRef.current = true;
+        }
+    };
 
     useEffect(() => {
-        // Initialize worker
-        workerRef.current = new Worker(
-            new URL('../workers/llm.worker.js', import.meta.url),
-            { type: 'module' }
-        );
+        // Reset state on mount
+        setModelState(prev => ({ ...prev, llm: false }));
+        setModelLoaded(false);
 
-        // Set up message handler
-        workerRef.current.onmessage = (e) => {
-            const { status, data, output, tps } = e.data;
+        const init = async () => {
+            await cleanup();
+            await initialize();
 
-            switch (status) {
-                case "loading":
-                    setLoadingMessage(data);
-                    break;
-                case "ready":
-                    setModelState(prev => ({ ...prev, llm: true }));
-                    setModelLoaded(true);
-                    setIsGenerating(false);
-                    setLoadingProgress(0);
-                    break;
-                case "update":
-                    setResponse(prev => prev + output);
-                    setTokensPerSecond(tps);
-                    break;
-                case "complete":
-                    setIsGenerating(false);
-                    setChatHistory(prev => [...prev, { role: "assistant", content: output }]);
-                    setResponse('');
-                    break;
-                case "progress":
-                    if (data.progress !== undefined) {
-                        setLoadingProgress(Math.round(data.progress));
-                    }
-                    break;
+            // Auto-load if previously loaded
+            if (modelState.llm && !modelLoaded) {
+                await loadModel();
             }
         };
 
-        // Auto-load if previously loaded and not already loaded
-        if (modelState.llm && !modelLoaded) {
-            workerRef.current.postMessage({ type: "load" });
-            setModelLoaded(true);
-        }
+        init();
 
-        return () => workerRef.current?.terminate();
+        // Cleanup on unmount
+        return () => {
+            cleanup();
+        };
     }, []); // modelState and modelLoaded intentionally not in deps
+
+    const loadModel = async () => {
+        setLoadingMessage("Loading model...");
+        setIsGenerating(true);
+
+        try {
+            if (!isInitializedRef.current) {
+                await initialize();
+            }
+
+            const modelUrl = LIST_MODELS[0].url; // Using the first model for now
+
+            // Download model if not cached
+            await modelManagerRef.current.downloadModel(modelUrl, {
+                progressCallback(opts) {
+                    setLoadingProgress(opts.loaded / opts.total * 100);
+                },
+            });
+
+            // Get cached model
+            const models = await modelManagerRef.current.getModels();
+            const model = models.find(m => m.url === modelUrl);
+
+            if (!model) {
+                throw new Error('Model not found in cache');
+            }
+
+            setLoadingMessage("Initializing model...");
+
+            await wllamaRef.current.loadModel(model, {
+                n_threads: DEFAULT_PARAMS.nThreads > 0 ? DEFAULT_PARAMS.nThreads : undefined,
+                n_ctx: DEFAULT_PARAMS.nContext,
+                n_batch: DEFAULT_PARAMS.nBatch,
+            });
+
+            setModelState(prev => ({ ...prev, llm: true }));
+            setModelLoaded(true);
+            setIsGenerating(false);
+            setLoadingProgress(0);
+        } catch (error) {
+            console.error('Error loading model:', error);
+            setIsGenerating(false);
+            setModelState(prev => ({ ...prev, llm: false }));
+            setModelLoaded(false);
+            await cleanup();
+        }
+    };
 
     const toggleModel = async () => {
         if (modelState.llm) {
             setModelState(prev => ({ ...prev, llm: false }));
             setModelLoaded(false);
-            // Optionally terminate worker here if you want to fully unload
-            workerRef.current?.terminate();
-            workerRef.current = new Worker(
-                new URL('../workers/llm.worker.js', import.meta.url),
-                { type: 'module' }
-            );
+            await cleanup();
         } else {
-            setIsGenerating(true);
-            try {
-                workerRef.current.postMessage({ type: "load" });
-            } catch (error) {
-                console.error('Error loading LLM model:', error);
-                setIsGenerating(false);
-            }
+            await loadModel();
         }
     };
 
@@ -96,24 +152,9 @@ export default function LLMChat({
 
         // If model isn't loaded, load it first
         if (!modelState.llm) {
-            setIsGenerating(true);
-            try {
-                workerRef.current.postMessage({ type: "load" });
-                // Wait for model to load before proceeding
-                await new Promise(resolve => {
-                    const originalOnMessage = workerRef.current.onmessage;
-                    workerRef.current.onmessage = (e) => {
-                        originalOnMessage(e);
-                        if (e.data.status === 'ready') {
-                            workerRef.current.onmessage = originalOnMessage;
-                            resolve();
-                        }
-                    };
-                });
-            } catch (error) {
-                console.error('Error loading LLM model:', error);
-                setIsGenerating(false);
-                return;
+            await loadModel();
+            if (!modelState.llm) {
+                return; // Loading failed
             }
         }
 
@@ -127,11 +168,35 @@ export default function LLMChat({
         setIsGenerating(true);
         setResponse('');
         setTokensPerSecond(0);
+        startTimeRef.current = performance.now();
+        numTokensRef.current = 0;
 
-        workerRef.current.postMessage({
-            type: "generate",
-            data: newMessages // Send entire message history
-        });
+        try {
+            // Convert messages array to input string
+            const prompt = newMessages.map(m => `${m.role}: ${m.content}`).join('\n');
+
+            const result = await wllamaRef.current.createCompletion(prompt, {
+                nPredict: DEFAULT_PARAMS.nPredict,
+                useCache: true,
+                sampling: {
+                    temp: DEFAULT_PARAMS.temperature,
+                },
+                onNewToken(token, piece, currentText, optionals) {
+                    numTokensRef.current++;
+                    const tps = (numTokensRef.current / (performance.now() - startTimeRef.current)) * 1000;
+
+                    setResponse(currentText);
+                    setTokensPerSecond(tps);
+                },
+            });
+
+            setIsGenerating(false);
+            setChatHistory(prev => [...prev, { role: "assistant", content: result }]);
+            setResponse('');
+        } catch (error) {
+            console.error('Error generating text:', error);
+            setIsGenerating(false);
+        }
     };
 
     // Add function to handle textarea auto-resize
@@ -176,7 +241,7 @@ export default function LLMChat({
                     <div className="flex flex-col gap-2 flex-grow max-w-md">
                         <div className="flex justify-between text-sm text-[#a0a0a0]">
                             <span>{loadingMessage}</span>
-                            <span>{loadingProgress}%</span>
+                            <span>{Math.round(loadingProgress)}%</span>
                         </div>
                         <div className="w-full bg-[#1a1a1a] rounded-full h-2">
                             <div
@@ -244,7 +309,6 @@ export default function LLMChat({
             >
                 {isGenerating ? 'Generating...' : 'Generate'}
             </button>
-
         </div>
     );
 } 
