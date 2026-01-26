@@ -8,8 +8,6 @@ const WLLAMA_CONFIG = {
     hfFile: 'LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
 };
 
-const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant.';
-
 const WLLAMA_CONFIG_PATHS = {
     'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@latest/esm/single-thread/wllama.wasm',
     'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@latest/esm/multi-thread/wllama.wasm',
@@ -25,30 +23,6 @@ async function supportsOPFS() {
     } catch (e) {
         return false;
     }
-}
-
-function formatMessages(messages) {
-    let prompt = '<|startoftext|>';
-    const hasSystem = messages.some(msg => msg.role === 'system');
-
-    const append = (role, content) => {
-        if (!content) return;
-        prompt += `<|im_start|>${role}\n${content}<|im_end|>\n`;
-    };
-
-    if (!hasSystem) {
-        append('system', DEFAULT_SYSTEM_PROMPT);
-    }
-
-    for (const msg of messages) {
-        if (!msg?.role || !msg?.content) continue;
-        if (msg.role === 'system' || msg.role === 'user' || msg.role === 'assistant') {
-            append(msg.role, msg.content);
-        }
-    }
-
-    prompt += '<|im_start|>assistant\n';
-    return prompt;
 }
 
 export async function checkBrowserSupport() {
@@ -93,7 +67,7 @@ export async function loadModel(onProgress, onStatus) {
 
     onStatus?.('Warming up...');
     onProgress?.(100, 'Warming up...');
-    await wllama.createCompletion('Hi', { nPredict: 1 });
+    await wllama.createChatCompletion([{ role: 'user', content: 'Hi' }], { nPredict: 1 });
 
     return 'wllama';
 }
@@ -105,7 +79,6 @@ export async function generate(messages, onToken, onComplete, onError) {
     }
 
     abortController = new AbortController();
-    const prompt = formatMessages(messages);
 
     let output = '';
     let numTokens = 0;
@@ -113,20 +86,16 @@ export async function generate(messages, onToken, onComplete, onError) {
     let tps = 0;
 
     try {
-        await wllama.createCompletion(prompt, {
+        await wllama.createChatCompletion(messages, {
             nPredict: 2048,
             sampling: {
                 temp: 0.7,
                 top_k: 40,
                 top_p: 0.9,
             },
-            stopTokens: ['<|im_end|>'],
+            useCache: true,
+            abortSignal: abortController.signal,
             onNewToken: (token, piece, currentText, { abortSignal }) => {
-                if (abortController?.signal.aborted) {
-                    abortSignal();
-                    return;
-                }
-
                 startTime ??= performance.now();
                 numTokens++;
 
@@ -134,7 +103,7 @@ export async function generate(messages, onToken, onComplete, onError) {
                     tps = ((numTokens - 1) / (performance.now() - startTime)) * 1000;
                 }
 
-                output = currentText.replaceAll('<|im_end|>', '').trimEnd();
+                output = currentText;
                 onToken?.(output, tps, numTokens);
             },
         });
