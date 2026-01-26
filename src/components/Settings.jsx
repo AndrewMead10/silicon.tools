@@ -11,7 +11,6 @@ export default function Settings({
     }, []);
 
     const loadModels = async (preferences) => {
-
         try {
             if (preferences.whisper && !modelState.whisper) {
                 const { pipeline } = await import('@huggingface/transformers');
@@ -27,13 +26,7 @@ export default function Settings({
                 setModelState(prev => ({ ...prev, tts: ttsModel }));
             }
 
-            if (preferences.llm && !modelState.llm) {
-                const { pipeline } = await import('@huggingface/transformers');
-                const llmModel = await pipeline('text-generation', 'Mozilla/Qwen2.5-0.5B-Instruct', {
-                    quantized: true
-                });
-                setModelState(prev => ({ ...prev, llm: llmModel }));
-            }
+            // LLM is handled by its own page/worker now
         } catch (error) {
             console.error('Error loading models:', error);
         }
@@ -46,7 +39,6 @@ export default function Settings({
             setModelState(prev => ({ ...prev, [modelId]: null }));
             preferences[modelId] = false;
         } else {
-
             try {
                 await loadModels({ ...preferences, [modelId]: true });
                 preferences[modelId] = true;
@@ -118,26 +110,34 @@ export default function Settings({
                         <div>
                             <div className="font-bold">Chat LLM</div>
                             <a
-                                href="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct"
+                                href="https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-sm text-[#ff7b00] hover:underline"
                             >
-                                Qwen2.5-0.5B-Instruct
+                                LFM 2.5 Instruct Q4_K_M
                             </a>
+                            <div className="text-xs text-[#666] mt-1">
+                                ~700MB · wllama (llama.cpp) · CPU optimized
+                            </div>
                             <div className={`text-sm ${modelState.llm ? 'text-green-500' : 'text-[#a0a0a0]'}`}>
                                 {modelState.llm ? 'Loaded' : 'Unloaded'}
                             </div>
                         </div>
-                        <button
-                            onClick={() => toggleModel('llm')}
-                            className="px-4 py-2 bg-[#1a1a1a] text-[#ff7b00] border border-[#ff7b00] rounded hover:bg-[#252525]"
-                        >
-                            {modelState.llm ? 'Unload' : 'Load'}
-                        </button>
+                        <div className="text-sm text-[#666]">
+                            Load from Chat page
+                        </div>
                     </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-[#0a0a0a] border border-[#252525] rounded">
+                    <h4 className="text-sm font-bold text-[#a0a0a0] mb-2">About Browser ML</h4>
+                    <p className="text-xs text-[#666] leading-relaxed">
+                        All models run entirely in your browser using WebGPU or WebAssembly. 
+                        No data is sent to any server. Models are cached locally after first download.
+                    </p>
                 </div>
             </div>
         </div>
     );
-} 
+}

@@ -10,8 +10,9 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@huggingface/transformers": "^3.3.2",
+        "@huggingface/transformers": "^3.8.1",
         "@tailwindcss/vite": "^4.0.0",
+        "@wllama/wllama": "^2.0.0",
         "better-react-mathjax": "^2.0.3",
         "dompurify": "^3.2.3",
         "kokoro-js": "^1.0.1",

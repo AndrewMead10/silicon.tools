@@ -1,4 +1,129 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import * as llm from '../utils/llm.js';
+
+// Configure marked for safe rendering
+marked.setOptions({
+    gfm: true,
+    breaks: true,
+});
+
+function MessageContent({ content }) {
+    const html = DOMPurify.sanitize(marked.parse(content || ''));
+    return (
+        <div 
+            className="markdown-content"
+            dangerouslySetInnerHTML={{ __html: html }}
+        />
+    );
+}
+
+function CopyButton({ text }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <button
+            onClick={handleCopy}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#666] hover:text-[#ff7b00] px-2 py-1"
+            title="Copy message"
+        >
+            {copied ? '✓ Copied' : 'Copy'}
+        </button>
+    );
+}
+
+function Message({ message, isStreaming }) {
+    const isUser = message.role === 'user';
+    
+    return (
+        <div className={`group flex gap-4 py-4 ${isUser ? 'flex-row-reverse' : ''}`}>
+            {/* Avatar */}
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                ${isUser ? 'bg-[#333] text-white' : 'bg-[#ff7b00] text-[#0a0a0a]'}`}>
+                {isUser ? 'U' : 'AI'}
+            </div>
+            
+            {/* Content */}
+            <div className={`flex-1 min-w-0 ${isUser ? 'text-right' : ''}`}>
+                <div className={`inline-block max-w-[85%] px-4 py-3 rounded-2xl text-left
+                    ${isUser 
+                        ? 'bg-[#ff7b00] text-[#0a0a0a] rounded-tr-sm' 
+                        : 'bg-[#1a1a1a] text-white rounded-tl-sm border border-[#252525]'
+                    }`}>
+                    {isUser ? (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                        <MessageContent content={message.content} />
+                    )}
+                    {isStreaming && (
+                        <span className="inline-block w-2 h-4 bg-[#ff7b00] ml-1 animate-pulse" />
+                    )}
+                </div>
+                {!isUser && message.content && (
+                    <div className="mt-1">
+                        <CopyButton text={message.content} />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function LoadingIndicator({ message, progress }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="relative w-20 h-20 mb-6">
+                <div className="absolute inset-0 border-4 border-[#252525] rounded-full" />
+                <div 
+                    className="absolute inset-0 border-4 border-[#ff7b00] rounded-full border-t-transparent animate-spin"
+                    style={{ animationDuration: '1s' }}
+                />
+                {progress > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[#ff7b00]">
+                        {progress}%
+                    </div>
+                )}
+            </div>
+            <p className="text-[#a0a0a0] text-sm text-center max-w-xs">{message}</p>
+        </div>
+    );
+}
+
+function EmptyState({ onLoadModel, isLoading }) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    return (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+            <div className="text-6xl mb-6">🧠</div>
+            <h2 className="text-2xl font-bold mb-2">LFM 2.5 Chat</h2>
+            <p className="text-[#a0a0a0] text-center max-w-md mb-8">
+                Chat with Liquid AI's LFM 2.5 running entirely in your browser. 
+                No data leaves your device.
+            </p>
+            <button
+                onClick={onLoadModel}
+                disabled={isLoading}
+                className="button-primary px-8 py-4 text-lg disabled:opacity-50"
+            >
+                {isLoading ? 'Loading...' : 'Load Model (~1.2GB)'}
+            </button>
+            <p className="text-[#666] text-xs mt-4 max-w-sm text-center">
+                {isIOS ? (
+                    <>Using transformers.js (ONNX) for iOS/Safari.</>
+                ) : (
+                    <>Using wllama (GGUF/llama.cpp). Runs on CPU — no GPU required.</>
+                )}
+            </p>
+        </div>
+    );
+}
 
 export default function LLMChat({
     modelState,
@@ -8,243 +133,248 @@ export default function LLMChat({
     chatHistory,
     setChatHistory
 }) {
-    const [response, setResponse] = useState('');
+    const [streamingContent, setStreamingContent] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isModelLoading, setIsModelLoading] = useState(false);
     const [tokensPerSecond, setTokensPerSecond] = useState(0);
+    const [tokenCount, setTokenCount] = useState(0);
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const workerRef = useRef(null);
+    const [error, setError] = useState(null);
+    const [inputValue, setInputValue] = useState('');
+    
+    const messagesEndRef = useRef(null);
+    const textareaRef = useRef(null);
+
+    // Auto-scroll to bottom
+    const scrollToBottom = useCallback(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, []);
 
     useEffect(() => {
-        // Initialize worker
-        workerRef.current = new Worker(
-            new URL('../workers/llm.worker.js', import.meta.url),
-            { type: 'module' }
-        );
+        scrollToBottom();
+    }, [chatHistory, streamingContent, scrollToBottom]);
 
-        // Set up message handler
-        workerRef.current.onmessage = (e) => {
-            const { status, data, output, tps } = e.data;
-
-            switch (status) {
-                case "loading":
-                    setLoadingMessage(data);
-                    break;
-                case "ready":
-                    setModelState(prev => ({ ...prev, llm: true }));
-                    setModelLoaded(true);
-                    setIsGenerating(false);
-                    setLoadingProgress(0);
-                    break;
-                case "update":
-                    setResponse(prev => prev + output);
-                    setTokensPerSecond(tps);
-                    break;
-                case "complete":
-                    setIsGenerating(false);
-                    setChatHistory(prev => [...prev, { role: "assistant", content: output }]);
-                    setResponse('');
-                    break;
-                case "progress":
-                    if (data.progress !== undefined) {
-                        setLoadingProgress(Math.round(data.progress));
-                    }
-                    break;
-            }
-        };
-
-        // Auto-load if previously loaded and not already loaded
-        if (modelState.llm && !modelLoaded) {
-            workerRef.current.postMessage({ type: "load" });
+    // Check if model is already loaded on mount
+    useEffect(() => {
+        if (llm.isLoaded()) {
+            setModelState(prev => ({ ...prev, llm: true }));
             setModelLoaded(true);
         }
+    }, [setModelState, setModelLoaded]);
 
-        return () => workerRef.current?.terminate();
-    }, []); // modelState and modelLoaded intentionally not in deps
+    const loadModel = async () => {
+        setError(null);
+        setIsModelLoading(true);
+        setLoadingMessage('Checking browser support...');
 
-    const toggleModel = async () => {
-        if (modelState.llm) {
-            setModelState(prev => ({ ...prev, llm: false }));
-            setModelLoaded(false);
-            // Optionally terminate worker here if you want to fully unload
-            workerRef.current?.terminate();
-            workerRef.current = new Worker(
-                new URL('../workers/llm.worker.js', import.meta.url),
-                { type: 'module' }
+        try {
+            const usedBackend = await llm.loadModel(
+                (progress, message) => {
+                    setLoadingProgress(progress);
+                    setLoadingMessage(message);
+                },
+                (status) => {
+                    setLoadingMessage(status);
+                }
             );
-        } else {
-            setIsGenerating(true);
-            try {
-                workerRef.current.postMessage({ type: "load" });
-            } catch (error) {
-                console.error('Error loading LLM model:', error);
-                setIsGenerating(false);
-            }
+            
+            setModelState(prev => ({ ...prev, llm: usedBackend }));
+            setModelLoaded(true);
+        } catch (err) {
+            setError(err.message || 'Failed to load model');
+        } finally {
+            setIsModelLoading(false);
+            setLoadingProgress(0);
+            setLoadingMessage('');
         }
     };
 
-    const generateText = async () => {
-        const input = document.getElementById('llmInput')?.value.trim();
+    const handleSubmit = async () => {
+        const input = inputValue.trim();
+        if (!input || isGenerating) return;
 
-        // Clear the textarea
-        document.getElementById('llmInput').value = '';
-
-        if (!input) {
-            alert('Please enter a prompt');
-            return;
+        setError(null);
+        setInputValue('');
+        
+        // Reset textarea height
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '56px';
         }
 
         // If model isn't loaded, load it first
-        if (!modelState.llm) {
-            setIsGenerating(true);
-            try {
-                workerRef.current.postMessage({ type: "load" });
-                // Wait for model to load before proceeding
-                await new Promise(resolve => {
-                    const originalOnMessage = workerRef.current.onmessage;
-                    workerRef.current.onmessage = (e) => {
-                        originalOnMessage(e);
-                        if (e.data.status === 'ready') {
-                            workerRef.current.onmessage = originalOnMessage;
-                            resolve();
-                        }
-                    };
-                });
-            } catch (error) {
-                console.error('Error loading LLM model:', error);
-                setIsGenerating(false);
-                return;
-            }
+        if (!modelLoaded) {
+            await loadModel();
+            if (!llm.isLoaded()) return; // Loading failed
         }
 
-        // Add user message to chat
-        const newMessages = [
-            ...chatHistory,
-            { role: "user", content: input }
-        ];
+        const newMessages = [...chatHistory, { role: "user", content: input }];
         setChatHistory(newMessages);
-
         setIsGenerating(true);
-        setResponse('');
+        setStreamingContent('');
         setTokensPerSecond(0);
+        setTokenCount(0);
 
-        workerRef.current.postMessage({
-            type: "generate",
-            data: newMessages // Send entire message history
-        });
+        await llm.generate(
+            newMessages,
+            (output, tps, numTokens) => {
+                setStreamingContent(output);
+                setTokensPerSecond(tps);
+                setTokenCount(numTokens);
+            },
+            (output, tps, numTokens) => {
+                setChatHistory(prev => [...prev, { role: "assistant", content: output }]);
+                setStreamingContent('');
+                setIsGenerating(false);
+            },
+            (errorMsg) => {
+                setError(errorMsg);
+                setIsGenerating(false);
+            }
+        );
     };
 
-    // Add function to handle textarea auto-resize
-    const handleTextareaInput = (e) => {
-        const textarea = e.target;
-        // Reset height to auto to get the correct scrollHeight
-        textarea.style.height = 'auto';
-        // Set new height based on scrollHeight, capped at 300px
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
+    const handleStop = () => {
+        llm.interrupt();
     };
+
+    const handleNewChat = () => {
+        setChatHistory([]);
+        setStreamingContent('');
+        setTokensPerSecond(0);
+        setTokenCount(0);
+        llm.reset();
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
+    const handleTextareaChange = (e) => {
+        setInputValue(e.target.value);
+        // Auto-resize
+        e.target.style.height = '56px';
+        e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+    };
+
+    const showEmptyState = !modelLoaded && !isModelLoading && chatHistory.length === 0;
+    const showLoading = isModelLoading && chatHistory.length === 0;
 
     return (
-        <div className="w-full max-w-3xl p-4 md:p-8">
-            <div className="flex items-center gap-4 mb-8">
-                <h2 className="text-2xl">
-                    AI Chat
-                    <span className="text-xs bg-[#ff7b00] text-[#0a0a0a] px-2 py-0.5 ml-2 align-middle">
-                        BETA
-                    </span>
-                </h2>
-                <div className="text-[#a0a0a0]">
-                    {!modelState.llm ? (isGenerating ? 'Loading model...' : 'Model not loaded') : 'Model ready'}
+        <div className="w-full max-w-3xl flex flex-col h-[calc(100vh-80px)] md:h-screen">
+            {/* Header */}
+            <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-[#252525]">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold">LFM 2.5 Chat</h1>
+                    {modelLoaded && (
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                            LFM 2.5 {modelState.llm === 'wllama' ? '(GGUF)' : '(ONNX)'}
+                        </span>
+                    )}
                 </div>
-                <div className="flex-1" />
-                {!modelState.llm && !isGenerating && (
-                    <button
-                        onClick={toggleModel}
-                        className="button-primary px-4 py-2"
-                    >
-                        Load Model
-                    </button>
-                )}
-                {modelState.llm && chatHistory.length > 0 && (
-                    <button
-                        onClick={() => setChatHistory([])}
-                        className="button-primary px-4 py-2"
-                    >
-                        New Chat
-                    </button>
-                )}
-                {isGenerating && !modelState.llm && (
-                    <div className="flex flex-col gap-2 flex-grow max-w-md">
-                        <div className="flex justify-between text-sm text-[#a0a0a0]">
-                            <span>{loadingMessage}</span>
-                            <span>{loadingProgress}%</span>
+                <div className="flex items-center gap-2">
+                    {isGenerating && (
+                        <div className="text-xs text-[#a0a0a0] mr-2">
+                            {tokensPerSecond.toFixed(1)} tok/s · {tokenCount} tokens
                         </div>
-                        <div className="w-full bg-[#1a1a1a] rounded-full h-2">
-                            <div
-                                className="bg-[#ff7b00] h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${loadingProgress}%` }}
-                            />
-                        </div>
-                    </div>
-                )}
+                    )}
+                    {chatHistory.length > 0 && (
+                        <button
+                            onClick={handleNewChat}
+                            className="button-secondary px-3 py-1.5 text-sm"
+                            disabled={isGenerating}
+                        >
+                            New Chat
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <p className="text-[#a0a0a0] text-sm mb-6">
-                Note: This model currently runs very slowly. We are working on making this faster.
-            </p>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4">
+                {showEmptyState && (
+                    <EmptyState onLoadModel={loadModel} isLoading={isModelLoading} />
+                )}
 
-            <div className="mb-6 space-y-4">
-                {chatHistory.map((message, index) => (
-                    <div
-                        key={index}
-                        className={`p-4 rounded ${message.role === "user"
-                            ? "bg-[#2a2a2a] ml-8"
-                            : "bg-[#1a1a1a] mr-8"
-                            }`}
-                    >
-                        <div className="text-xs text-[#a0a0a0] mb-1">
-                            {message.role === "user" ? "You" : "Assistant"}
-                        </div>
-                        <div className="whitespace-pre-wrap">
-                            {message.content}
-                        </div>
+                {showLoading && (
+                    <LoadingIndicator message={loadingMessage} progress={loadingProgress} />
+                )}
+
+                {error && (
+                    <div className="my-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                        {error}
                     </div>
+                )}
+
+                {chatHistory.map((msg, i) => (
+                    <Message key={i} message={msg} />
                 ))}
 
-                {isGenerating && (
-                    <div className="p-4 rounded bg-[#1a1a1a] mr-8">
-                        <div className="text-xs text-[#a0a0a0] mb-1">
-                            Assistant
+                {isGenerating && streamingContent && (
+                    <Message 
+                        message={{ role: 'assistant', content: streamingContent }} 
+                        isStreaming={true}
+                    />
+                )}
+
+                {isGenerating && !streamingContent && (
+                    <div className="flex gap-4 py-4">
+                        <div className="w-8 h-8 rounded-full bg-[#ff7b00] flex items-center justify-center text-sm font-bold text-[#0a0a0a]">
+                            AI
                         </div>
-                        <div className="whitespace-pre-wrap">
-                            {response}
+                        <div className="flex items-center gap-1 text-[#666]">
+                            <span className="w-2 h-2 bg-[#ff7b00] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 bg-[#ff7b00] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 bg-[#ff7b00] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                     </div>
                 )}
+
+                <div ref={messagesEndRef} />
             </div>
 
-            {tokensPerSecond > 0 && (
-                <div className="text-[#a0a0a0] text-sm mb-2">
-                    Generating ({tokensPerSecond.toFixed(2)} tokens/sec)
+            {/* Input */}
+            {(modelLoaded || chatHistory.length > 0 || isModelLoading) && (
+                <div className="flex-shrink-0 p-4 border-t border-[#252525]">
+                    <div className="flex gap-3">
+                        <textarea
+                            ref={textareaRef}
+                            value={inputValue}
+                            onChange={handleTextareaChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Message LFM 2.5..."
+                            disabled={isGenerating || isModelLoading}
+                            className="flex-1 p-4 bg-[#1a1a1a] border border-[#333] rounded-xl resize-none 
+                                focus:outline-none focus:border-[#ff7b00] transition-colors
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ height: '56px', maxHeight: '200px' }}
+                        />
+                        {isGenerating ? (
+                            <button
+                                onClick={handleStop}
+                                className="px-6 py-4 bg-red-500/20 text-red-400 border border-red-500/30 
+                                    rounded-xl hover:bg-red-500/30 transition-colors font-medium"
+                            >
+                                Stop
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={!inputValue.trim() || isModelLoading}
+                                className="button-primary px-6 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Send
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-xs text-[#666] mt-2 text-center">
+                        Press Enter to send, Shift+Enter for new line
+                    </p>
                 </div>
             )}
-
-            <textarea
-                id="llmInput"
-                className="w-full p-4 bg-[#1a1a1a] border border-[#333] text-white rounded resize-none overflow-y-auto mb-4"
-                placeholder="Enter your prompt..."
-                onInput={handleTextareaInput}
-                rows={1}
-                style={{ height: '52px' }} // 52px = 1 line + padding
-            />
-
-            <button
-                onClick={generateText}
-                disabled={isGenerating}
-                className="button-primary w-full p-4 disabled:opacity-50"
-            >
-                {isGenerating ? 'Generating...' : 'Generate'}
-            </button>
-
         </div>
     );
-} 
+}

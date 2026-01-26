@@ -1,169 +1,175 @@
-import {
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    TextStreamer,
-    InterruptableStoppingCriteria,
-} from "@huggingface/transformers";
+// Import from the ESM build directly
+import { Wllama } from '@wllama/wllama/esm/index.js';
 
-class TextGenerationPipeline {
-    static model_id = "Mozilla/Qwen2.5-0.5B-Instruct";
+let wllama = null;
 
-    static async getInstance(progress_callback = null) {
-        this.tokenizer ??= AutoTokenizer.from_pretrained(this.model_id, {
-            progress_callback,
-        });
-        this.model ??= AutoModelForCausalLM.from_pretrained(this.model_id, {
-            progress_callback,
-        });
-        return Promise.all([this.tokenizer, this.model]);
+const MODEL_CONFIG = {
+    hfRepo: 'LiquidAI/LFM2.5-1.2B-Instruct-GGUF',
+    hfFile: 'LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+};
+
+// WASM paths from CDN
+const WLLAMA_CONFIG_PATHS = {
+    'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@latest/esm/single-thread/wllama.wasm',
+    'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@latest/esm/multi-thread/wllama.wasm',
+};
+
+// Chat template for LFM 2.5
+function formatMessages(messages) {
+    let prompt = '';
+    for (const msg of messages) {
+        prompt += `${msg.role}\n${msg.content}\n`;
     }
-}
-
-const stopping_criteria = new InterruptableStoppingCriteria();
-let past_key_values_cache = null;
-
-async function generate(messages) {
-    const [tokenizer, model] = await TextGenerationPipeline.getInstance();
-
-    let startTime;
-    let numTokens = 0;
-    let tps;
-    let state = "answering"; // Default state
-
-    // Special handling for DeepSeek model
-    if (TextGenerationPipeline.model_id === "onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX") {
-        const [START_THINKING_TOKEN_ID, END_THINKING_TOKEN_ID] = tokenizer.encode(
-            "<think></think>",
-            { add_special_tokens: false },
-        );
-        state = "thinking";
-    }
-
-    const token_callback_function = (tokens) => {
-        startTime ??= performance.now();
-        if (numTokens++ > 0) {
-            tps = (numTokens / (performance.now() - startTime)) * 1000;
-        }
-
-        // Handle thinking state transition for DeepSeek model
-        if (TextGenerationPipeline.model_id === "onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX") {
-            if (Array.isArray(tokens) && tokens[0] === END_THINKING_TOKEN_ID) {
-                state = "answering";
-            }
-        }
-    };
-
-    const callback_function = (output) => {
-        // Extract just the assistant's response by removing everything before "assistant\n"
-        const assistantResponse = output.split("assistant\n").pop();
-
-        self.postMessage({
-            status: "update",
-            output: assistantResponse,
-            tps,
-            numTokens,
-            state,
-        });
-    };
-
-    const streamer = new TextStreamer(tokenizer, {
-        skip_special_tokens: true,
-        callback_function,
-        token_callback_function,
-    });
-
-    self.postMessage({ status: "start" });
-
-    // Handle input based on whether it's a chat message or plain text
-    let inputs;
-    if (Array.isArray(messages)) {
-        inputs = tokenizer.apply_chat_template(messages, {
-            add_generation_prompt: true,
-            return_dict: true,
-        });
-    } else {
-        inputs = tokenizer(messages);
-    }
-
-    const { past_key_values, sequences } = await model.generate({
-        ...inputs,
-        past_key_values: past_key_values_cache,
-        max_new_tokens: 2048,
-        do_sample: false,
-        streamer,
-        stopping_criteria,
-        return_dict_in_generate: true,
-    });
-
-    past_key_values_cache = past_key_values;
-
-    const decoded = tokenizer.batch_decode(sequences, {
-        skip_special_tokens: true,
-    });
-
-    // Extract just the assistant's final response
-    const assistantResponse = decoded[0].split("assistant\n").pop();
-
-    self.postMessage({
-        status: "complete",
-        output: assistantResponse,
-    });
+    prompt += 'assistant\n';
+    return prompt;
 }
 
 async function load() {
     self.postMessage({
-        status: "loading",
-        data: "Loading model...",
+        status: 'loading',
+        message: 'Initializing wllama...',
+        progress: 0,
     });
 
-    const [tokenizer, model] = await TextGenerationPipeline.getInstance((progress) => {
-        // Convert the progress event from transformers.js into a percentage
-        if (progress.status === "progress") {
+    wllama = new Wllama(WLLAMA_CONFIG_PATHS, {
+        parallelDownloads: 3,
+    });
+
+    await wllama.loadModelFromHF(MODEL_CONFIG.hfRepo, MODEL_CONFIG.hfFile, {
+        progressCallback: ({ loaded, total }) => {
+            const progress = Math.round((loaded / total) * 100);
             self.postMessage({
-                status: "progress",
-                data: {
-                    progress: progress.progress,
-                }
+                status: 'progress',
+                message: `Downloading model... ${(loaded / 1024 / 1024).toFixed(0)}MB / ${(total / 1024 / 1024).toFixed(0)}MB`,
+                progress,
             });
-        }
-        // Forward the loading message
-        if (progress.status === "loading") {
-            self.postMessage({
-                status: "loading",
-                data: progress.message || "Loading model files...",
-            });
-        }
+        },
     });
 
     self.postMessage({
-        status: "loading",
-        data: "Warming up model...",
+        status: 'loading',
+        message: 'Model loaded, warming up...',
+        progress: 100,
     });
 
-    // Warmup
-    const inputs = tokenizer("test");
-    await model.generate({ ...inputs, max_new_tokens: 1 });
+    // Quick warmup
+    await wllama.createCompletion('Hi', { nPredict: 1 });
 
-    self.postMessage({ status: "ready" });
+    self.postMessage({ status: 'ready' });
 }
 
-self.addEventListener("message", async (e) => {
+let abortController = null;
+
+async function generate(messages) {
+    if (!wllama) {
+        self.postMessage({
+            status: 'error',
+            message: 'Model not loaded',
+        });
+        return;
+    }
+
+    abortController = new AbortController();
+    const prompt = formatMessages(messages);
+    
+    let output = '';
+    let numTokens = 0;
+    let startTime = null;
+    let tps = 0;
+
+    self.postMessage({ status: 'start' });
+
+    try {
+        await wllama.createCompletion(prompt, {
+            nPredict: 2048,
+            sampling: {
+                temp: 0.7,
+                top_k: 40,
+                top_p: 0.9,
+            },
+            onNewToken: (token, piece, currentText, { abortSignal }) => {
+                if (abortController.signal.aborted) {
+                    abortSignal();
+                    return;
+                }
+
+                startTime ??= performance.now();
+                numTokens++;
+                
+                if (numTokens > 1) {
+                    tps = ((numTokens - 1) / (performance.now() - startTime)) * 1000;
+                }
+
+                output = currentText;
+
+                self.postMessage({
+                    status: 'update',
+                    output: output,
+                    tps,
+                    numTokens,
+                });
+            },
+        });
+
+        self.postMessage({
+            status: 'complete',
+            output: output,
+            tps,
+            numTokens,
+        });
+    } catch (error) {
+        if (abortController.signal.aborted) {
+            // User interrupted, send what we have
+            self.postMessage({
+                status: 'complete',
+                output: output,
+                tps,
+                numTokens,
+            });
+        } else {
+            self.postMessage({
+                status: 'error',
+                message: error.message || 'Generation failed',
+            });
+        }
+    }
+
+    abortController = null;
+}
+
+function interrupt() {
+    if (abortController) {
+        abortController.abort();
+    }
+}
+
+async function reset() {
+    // Clear KV cache if supported
+    // wllama handles this internally for new completions
+}
+
+self.addEventListener('message', async (e) => {
     const { type, data } = e.data;
 
     switch (type) {
-        case "load":
-            load();
+        case 'load':
+            try {
+                await load();
+            } catch (error) {
+                self.postMessage({
+                    status: 'error',
+                    message: error.message || 'Failed to load model',
+                });
+            }
             break;
-        case "generate":
-            stopping_criteria.reset();
-            generate(data);
+        case 'generate':
+            await generate(data);
             break;
-        case "interrupt":
-            stopping_criteria.interrupt();
+        case 'interrupt':
+            interrupt();
             break;
-        case "reset":
-            past_key_values_cache = null;
-            stopping_criteria.reset();
+        case 'reset':
+            await reset();
             break;
     }
-}); 
+});
