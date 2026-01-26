@@ -142,6 +142,7 @@ export default function LLMChat({
     const [loadingMessage, setLoadingMessage] = useState('');
     const [error, setError] = useState(null);
     const [inputValue, setInputValue] = useState('');
+    const [isIsolated, setIsIsolated] = useState(false);
     
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
@@ -162,6 +163,10 @@ export default function LLMChat({
             setModelLoaded(true);
         }
     }, [setModelState, setModelLoaded]);
+
+    useEffect(() => {
+        setIsIsolated(Boolean(window.crossOriginIsolated));
+    }, []);
 
     const loadModel = async () => {
         setError(null);
@@ -274,6 +279,9 @@ export default function LLMChat({
                             LFM 2.5 {modelState.llm === 'wllama' ? '(GGUF)' : '(ONNX)'}
                         </span>
                     )}
+                    <span className={`text-xs px-2 py-1 rounded-full ${isIsolated ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                        {isIsolated ? 'Multithreaded' : 'Single-thread'}
+                    </span>
                 </div>
                 <div className="flex items-center gap-2">
                     {isGenerating && (
