@@ -158,7 +158,7 @@ export default function LLMChat({
     // Check if model is already loaded on mount
     useEffect(() => {
         if (llm.isLoaded()) {
-            setModelState(prev => ({ ...prev, llm: true }));
+            setModelState(prev => ({ ...prev, llm: 'wllama' }));
             setModelLoaded(true);
         }
     }, [setModelState, setModelLoaded]);

@@ -77,6 +77,8 @@ export async function loadModel(onProgress, onStatus) {
     onStatus?.('Warming up...');
     onProgress?.(100, 'Warming up...');
     await wllama.createCompletion('Hi', { nPredict: 1 });
+
+    return 'wllama';
 }
 
 export async function generate(messages, onToken, onComplete, onError) {
@@ -139,4 +141,16 @@ export function interrupt() {
 
 export function isLoaded() {
     return wllama !== null;
+}
+
+export async function reset() {
+    // wllama doesn't have a built-in reset, but we can clear the context
+    // by creating a minimal completion to reset internal state
+    if (wllama) {
+        try {
+            await wllama.kvClear();
+        } catch {
+            // kvClear may not be available in all versions
+        }
+    }
 }
