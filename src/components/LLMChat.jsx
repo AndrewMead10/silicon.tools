@@ -112,7 +112,7 @@ function EmptyState({ onLoadModel, isLoading }) {
                 disabled={isLoading}
                 className="button-primary px-8 py-4 text-lg disabled:opacity-50"
             >
-                {isLoading ? 'Loading...' : 'Load Model (~1.2GB)'}
+                {isLoading ? 'Loading...' : 'Load Model (~700MB)'}
             </button>
             <p className="text-[#666] text-xs mt-4 max-w-sm text-center">
                 {isIOS ? (

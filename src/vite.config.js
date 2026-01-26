@@ -12,6 +12,13 @@ export default defineConfig({
             'Cross-Origin-Embedder-Policy': 'require-corp',
         },
     },
+    preview: {
+        headers: {
+            // Required for SharedArrayBuffer (multi-threading in wllama)
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'require-corp',
+        },
+    },
     optimizeDeps: {
         exclude: ['@wllama/wllama'],
     },
